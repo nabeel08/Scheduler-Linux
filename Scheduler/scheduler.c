@@ -8,7 +8,7 @@
 #include <unistd.h>
 
 
-#define CPUs 1
+#define CPUs 3
 
 
 // Data Structure for task 
@@ -73,18 +73,21 @@ int isFull(queue *pt)
 
 }
 
-void insert_task(queue *pt, task_t task){
-
-// get arrival time
+void get_time(char *t_ptr){
+    
     time_t s;
     struct tm* current_time;
     time(&s); // To set the time object
     current_time = localtime(&s); // To get time information
+    sprintf(t_ptr, "%d:%d:%d",current_time->tm_hour, current_time->tm_min, current_time->tm_sec);
+}
+
+void insert_task(queue *pt, task_t task){
     
     pt->task[pt->rear].task_no = task.task_no;
     pt->task[pt->rear].cpu_burst = task.cpu_burst;
     pt->task[pt->rear].arrival_time=(char *)malloc(10*sizeof(char));
-    sprintf(pt->task[pt->rear].arrival_time, "%d:%d:%d",current_time->tm_hour, current_time->tm_min, current_time->tm_sec);
+    get_time(pt->task[pt->rear].arrival_time);
     printf("\nInserted task -> task no: %d arrival time: %s",pt->task[pt->rear].task_no,pt->task[pt->rear].arrival_time);
 }
 
@@ -207,17 +210,20 @@ void *cpu(void *id){
     while(1){
         
         pthread_mutex_lock(&q_lock);
-        if(isEmpty(pt)){ // check queue is empty
-            // wait for tasks to be appended to the buffer
-            if(rv!=0){
-                printf("\nCPU Thread Waiting !!!");
-                pthread_cond_wait(&can_consume, &q_lock);
+        check:
+            if(isEmpty(pt)){ // check queue is empty
+                // wait for tasks to be appended to the buffer
+                if(rv!=0){
+                    printf("\nCPU %d Thread Waiting !!!",thread_id);
+                    pthread_cond_wait(&can_consume, &q_lock);
+                    goto check;
+                }
+                else{
+                     pthread_cond_signal(&can_consume);
+                     pthread_mutex_unlock(&q_lock);
+                     break;
+                }
             }
-            else{
-                 pthread_mutex_unlock(&q_lock);
-                 break;
-            }
-        }
         //check if all tasks are completed
         if(rv==0){
             if(isEmpty(pt)){
